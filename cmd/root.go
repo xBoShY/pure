@@ -11,7 +11,7 @@ import (
 	"github.com/xboshy/pure/internal/vault"
 	"github.com/xboshy/pure/internal/vault/algorithms"
 	"go.bryk.io/pkg/errors"
-	xlog "go.bryk.io/pkg/log"
+	xLog "go.bryk.io/pkg/log"
 )
 
 var algorithm = algorithms.Ed25519()
@@ -28,7 +28,7 @@ https://github.com/xboshy/pure`,
 }
 
 var (
-	log      xlog.Logger
+	log      xLog.Logger
 	cfgVault vault.Config
 	homeDir  = ""
 )
@@ -55,7 +55,7 @@ func Execute() {
 }
 
 func init() {
-	log = xlog.WithZero(xlog.ZeroOptions{PrettyPrint: true})
+	log = xLog.WithZero(xLog.ZeroOptions{PrettyPrint: true})
 	cobra.OnInitialize(initConfig)
 }
 

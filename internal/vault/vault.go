@@ -16,13 +16,13 @@ type Client struct {
 }
 
 type KeyConfig struct {
-	KeyAlgo Algorithm
-	KeyName string
+	Algo Algorithm
+	Name string
 }
 
 type Key struct {
-	KeyName    string
-	KeyVersion int64
+	Name    string
+	Version int64
 }
 
 // NewClient creates a new Vault client
@@ -46,7 +46,7 @@ func NewClient(config Config, algorithm Algorithm) (*Client, error) {
 	return vc, nil
 }
 
-func (c *Client) ListKeys(ctx context.Context) ([]string, error) {
+func (c *Client) ListKeys(ctx context.Context) ([]Key, error) {
 	path := fmt.Sprintf("%s/keys", c.path)
 
 	secret, err := c.vault.Logical().List(path)
@@ -63,9 +63,14 @@ func (c *Client) ListKeys(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("failed to read keys")
 	}
 
-	keys := []string{}
-	for _, k := range obj.([]any) {
-		keys = append(keys, k.(string))
+	keys := []Key{}
+	for _, v := range obj.([]any) {
+		key := Key{
+			Name:    v.(string),
+			Version: 1,
+		}
+
+		keys = append(keys, key)
 	}
 
 	return keys, nil
@@ -74,9 +79,9 @@ func (c *Client) ListKeys(ctx context.Context) ([]string, error) {
 // NewKey requests the transit engine to generate a new key
 // with algorithm-specific params
 func (c *Client) NewKey(ctx context.Context, cfg KeyConfig) error {
-	path := fmt.Sprintf("%s/keys/%s", c.path, cfg.KeyName)
+	path := fmt.Sprintf("%s/keys/%s", c.path, cfg.Name)
 
-	params := cfg.KeyAlgo.Params()
+	params := cfg.Algo.Params()
 	_, err := c.vault.Logical().Write(path, params)
 	if err != nil {
 		return fmt.Errorf("failed to request new key: %w", err)
@@ -87,8 +92,8 @@ func (c *Client) NewKey(ctx context.Context, cfg KeyConfig) error {
 
 // GetPublicKey returns the Public Key for the provided Key
 func (c *Client) GetPublicKey(ctx context.Context, key Key) ([]byte, error) {
-	versionStr := strconv.FormatInt(key.KeyVersion, 10)
-	path := fmt.Sprintf("%s/keys/%s", c.path, key.KeyName)
+	versionStr := strconv.FormatInt(key.Version, 10)
+	path := fmt.Sprintf("%s/keys/%s", c.path, key.Name)
 
 	secret, err := c.vault.Logical().Read(path)
 	if err != nil {
@@ -96,7 +101,7 @@ func (c *Client) GetPublicKey(ctx context.Context, key Key) ([]byte, error) {
 	}
 
 	if secret == nil {
-		return nil, fmt.Errorf("key %s does not exist", key.KeyName)
+		return nil, fmt.Errorf("key %s does not exist", key.Name)
 	}
 
 	obj, ok := secret.Data["keys"]
@@ -154,15 +159,15 @@ func (c *Client) GetParams(ctx context.Context, keyName string) (map[string]any,
 func (c *Client) SignData(
 	ctx context.Context, data []byte, key Key,
 ) ([]byte, error) {
-	path := fmt.Sprintf("%s/sign/%s", c.path, key.KeyName)
-	params, err := c.GetParams(ctx, key.KeyName)
+	path := fmt.Sprintf("%s/sign/%s", c.path, key.Name)
+	params, err := c.GetParams(ctx, key.Name)
 	if err != nil {
-		return nil, fmt.Errorf("key %s not found: %w", key.KeyName, err)
+		return nil, fmt.Errorf("key %s not found: %w", key.Name, err)
 	}
 
 	input := base64.StdEncoding.EncodeToString(data)
 	params["input"] = input
-	params["key_version"] = key.KeyVersion
+	params["key_version"] = key.Version
 
 	secret, err := c.vault.Logical().Write(path, params)
 	if err != nil {
@@ -173,7 +178,6 @@ func (c *Client) SignData(
 		return nil, fmt.Errorf("no signature returned")
 	}
 
-	// TODO: review signature and the correct data structure to be returned
 	signature, ok := secret.Data["signature"].(string)
 	if !ok {
 		return nil, fmt.Errorf("signature not found in Vault response")
@@ -184,5 +188,13 @@ func (c *Client) SignData(
 		return nil, fmt.Errorf("invalid signature format")
 	}
 
-	return nil, nil
+	sigStr := parts[2]
+
+	signatureB64, err := base64.StdEncoding.DecodeString(sigStr)
+	if err != nil {
+		fmt.Printf("\n%s\n", sigStr)
+		return nil, err
+	}
+
+	return signatureB64, nil
 }

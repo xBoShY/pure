@@ -5,34 +5,38 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/xboshy/pure/internal/vault"
-	xlog "go.bryk.io/pkg/log"
+	xLog "go.bryk.io/pkg/log"
 )
 
-var listCmd = &cobra.Command{
+var didListCmd = &cobra.Command{
 	Use:     "list",
 	Aliases: []string{"ls"},
 	Short:   "List the current vault keys",
-	Example: "pure ls",
+	Example: "pure did ls",
 	RunE: func(_ *cobra.Command, args []string) error {
+		ctx := context.Background()
 		client, err := vault.NewClient(cfgVault, algorithm)
 		if err != nil {
 			return err
 		}
 
-		ctx := context.Background()
-
-		keys, err := client.ListKeys(ctx)
+		didKeys, err := didList(ctx, client)
 		if err != nil {
 			return err
 		}
 
-		log.WithFields(xlog.Fields{
-			"keys": keys,
-		}).Info("keys retrieved")
+		for d, key := range didKeys {
+			log.WithFields(xLog.Fields{
+				"key": key,
+				"did": d.String(),
+			}).Info("")
+		}
+
+		log.Info("all keys retrieved")
 		return nil
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(listCmd)
+	didCmd.AddCommand(didListCmd)
 }

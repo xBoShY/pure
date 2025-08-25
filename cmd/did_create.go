@@ -4,25 +4,25 @@ import (
 	"context"
 	"crypto/ed25519"
 
-	"github.com/kennygrant/sanitize"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/xboshy/pure/internal/did"
 	"github.com/xboshy/pure/internal/vault"
-	"go.bryk.io/pkg/errors"
-	xlog "go.bryk.io/pkg/log"
+	xLog "go.bryk.io/pkg/log"
 )
 
-var createCmd = &cobra.Command{
+var didCreateCmd = &cobra.Command{
 	Use:     "create",
-	Aliases: []string{"new"},
+	Aliases: []string{"gen", "new"},
 	Short:   "Create a new DID",
-	Example: "pure new [alias]",
+	Example: "pure did new",
 	RunE: func(_ *cobra.Command, args []string) error {
-		// Get parameters
-		if len(args) != 1 {
-			return errors.New("you must provide an alias for your did")
+		uuid, err := uuid.NewV6()
+		if err != nil {
+			return err
 		}
-		name := sanitize.Name(args[0])
+
+		name := uuid.String()
 
 		client, err := vault.NewClient(cfgVault, algorithm)
 		if err != nil {
@@ -31,8 +31,8 @@ var createCmd = &cobra.Command{
 
 		ctx := context.Background()
 		cfg := vault.KeyConfig{
-			KeyAlgo: algorithm,
-			KeyName: name,
+			Algo: algorithm,
+			Name: name,
 		}
 
 		err = client.NewKey(ctx, cfg)
@@ -41,8 +41,8 @@ var createCmd = &cobra.Command{
 		}
 
 		key := vault.Key{
-			KeyName:    name,
-			KeyVersion: 1,
+			Name:    name,
+			Version: 1,
 		}
 
 		pub, err := client.GetPublicKey(ctx, key)
@@ -57,14 +57,14 @@ var createCmd = &cobra.Command{
 
 		d, err := obj.DID("mainnet")
 
-		log.WithFields(xlog.Fields{
-			"name": name,
-			"did":  d.String(),
+		log.WithFields(xLog.Fields{
+			"key": key,
+			"did": d.String(),
 		}).Info("new wallet created")
 		return nil
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(createCmd)
+	didCmd.AddCommand(didCreateCmd)
 }

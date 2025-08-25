@@ -2,19 +2,13 @@ package did
 
 import (
 	"crypto/ed25519"
-	"crypto/sha512"
 	"errors"
 )
 
-const (
-	checksumLenBytes = 4
-	hashLenBytes     = sha512.Size256
-)
-
-type Object [hashLenBytes]byte
+type Object = Id
 
 func (o Object) Id() Id {
-	return []byte(o[:])
+	return o
 }
 
 func NewObject(pub ed25519.PublicKey) (Object, error) {
@@ -32,4 +26,11 @@ func (o Object) DID(network string) (DID, error) {
 		Network: network,
 		Id:      o.Id(),
 	}, nil
+}
+
+func (o Object) CanonicalPublicKey() (ed25519.PublicKey, error) {
+	var p ed25519.PublicKey = make(ed25519.PublicKey, ed25519.PublicKeySize)
+	copy(p, o[:])
+
+	return p, nil
 }
